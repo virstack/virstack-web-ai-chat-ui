@@ -1,0 +1,15 @@
+{
+  "name": "chat_bot_widget",
+  "version": "1.0.0",
+  "description": "VirstackAI Chatbot Widget",
+  "main": "index.js",
+  "scripts": {
+    "build": "esbuild virstack_ai_web_chat_ui.js --bundle --outfile=dist/virstack_ai_web_chat_ui.umd.js --format=iife --global-name=VirstackAIWebChatUIWidget --platform=browser"
+  },
+  "author": "Virstack LLC",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.27.0",
+    "microbundle": "^0.15.1"
+  }
+}

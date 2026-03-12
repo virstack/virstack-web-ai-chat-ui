@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Virstack AI Widget</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* Demo content to show widget overlay */
+    .demo-content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .demo-content h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .demo-content p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+<!-- Demo page content -->
+<div class="demo-content">
+  <h1>Welcome to Your Website</h1>
+  <p>This is a demo page showing how the Virstack AI widget integrates into your website. The AI assistant widget appears in the bottom right corner and can be used on any page.</p>
+  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+  <p>Click the AI assistant button in the bottom right corner to start a conversation with our AI.</p>
+  <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+</div>
+<script
+        data-virstack-widget
+        src="./virstack_ai_web_chat_ui.js"
+        data-primary-color="#D68B4B"
+        data-secondary-color="#024A6D"
+        data-server-url="https://localhost:3000"
+        data-icon-url=""
+        data-button-size="60"
+        data-title="My Assistant"
+        data-greeting-message="Hello! How can I help you today?"
+        data-suggestions="What are your fees?, Tell me about your services, How do I get started?, Contact support"
+></script>
+</body>
+</html>
