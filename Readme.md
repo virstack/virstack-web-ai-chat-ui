@@ -41,7 +41,7 @@ Download `dist/virstack_ai_web_chat_ui.umd.js` from this repo and add it to your
 
   <!-- Add this before </body> -->
   <script
-    src="./virstack_ai_web_chat_ui.umd.js"
+    src="https://cdn.jsdelivr.net/gh/virstack/virstack-web-ai-chat-ui@v1.0.2/dist/virstack_ai_web_chat_ui.umd.js"
     data-virstack-widget
     data-server-url="https://your-api.example.com/chat"
     data-title="My Assistant"
@@ -107,7 +107,7 @@ All options are set as `data-*` attributes on the `<script>` tag.
 
 ```html
 <script
-  src="./virstack_ai_web_chat_ui.umd.js"
+  src="https://cdn.jsdelivr.net/gh/virstack/virstack-web-ai-chat-ui@v1.0.2/dist/virstack_ai_web_chat_ui.umd.js"
   data-virstack-widget
   data-server-url="https://api.yourapp.com/chat"
   data-primary-color="#10b981"
@@ -187,7 +187,7 @@ Manually initialise the widget with optional config overrides. Any key passed he
 
 ```html
 <!-- Load without data-virstack-widget so it doesn't auto-init -->
-<script src="./virstack_ai_web_chat_ui.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/virstack/virstack-web-ai-chat-ui@v1.0.2/dist/virstack_ai_web_chat_ui.umd.js"></script>
 <script>
   const widget = VirstackAIWebChatUIWidget.init({
     serverUrl:       'https://api.yourapp.com/chat',
