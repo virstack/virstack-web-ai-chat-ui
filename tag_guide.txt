@@ -1,0 +1,15 @@
+# Make sure dist/ is committed (not in .gitignore)
+git add dist/virstack_ai_web_chat_ui.umd.js
+git commit -m "add dist build"
+
+# Delete the old tag and re-push
+git tag -d v1.0.6
+git push origin :refs/tags/v1.0.6
+
+# Re-tag and push
+git tag v1.0.6
+git push origin v1.0.6
+
+
+then purge the jsDelivr cache again. That should fix it.
+https://purge.jsdelivr.net/gh/virstack/virstack-web-ai-chat-ui@v1.0.6/dist/virstack_ai_web_chat_ui.umd.js
