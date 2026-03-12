@@ -50,19 +50,19 @@ function readAttr(el, name, fallback) {
 
 function buildConfig(el, overrides = {}) {
     return {
-        primaryColor:    readAttr(el, 'data-primary-color',    '#D68B4B'),
-        secondaryColor:  readAttr(el, 'data-secondary-color',  '#324A6D'),
-        serverUrl:       readAttr(el, 'data-server-url',       'http://localhost:8000'),
-        iconUrl:         readAttr(el, 'data-icon-url',         ''),
-        buttonSize:      parseInt(readAttr(el, 'data-button-size', '64'), 10),
-        title:           readAttr(el, 'data-title',            'Chat Assistant'),
-        statusText:      readAttr(el, 'data-status-text',      'Always here for you'),
-        placeholder:     readAttr(el, 'data-placeholder',      'Ask me anything...'),
+        primaryColor: readAttr(el, 'data-primary-color', '#D68B4B'),
+        secondaryColor: readAttr(el, 'data-secondary-color', '#324A6D'),
+        serverUrl: readAttr(el, 'data-server-url', 'http://localhost:8000'),
+        iconUrl: readAttr(el, 'data-icon-url', ''),
+        buttonSize: parseInt(readAttr(el, 'data-button-size', '64'), 10),
+        title: readAttr(el, 'data-title', 'Chat Assistant'),
+        statusText: readAttr(el, 'data-status-text', 'Always here for you'),
+        placeholder: readAttr(el, 'data-placeholder', 'Ask me anything...'),
         greetingMessage: readAttr(el, 'data-greeting-message',
             "Hello! \uD83D\uDC4B I'm here to help. How can I assist you today?"),
-        suggestions:     readAttr(el, 'data-suggestions', ''),
-        autoOpen:        readAttr(el, 'data-auto-open', 'true') !== 'false',
-        autoOpenDelay:   parseInt(readAttr(el, 'data-auto-open-delay', '800'), 10),
+        suggestions: readAttr(el, 'data-suggestions', ''),
+        autoOpen: readAttr(el, 'data-auto-open', 'true') !== 'false',
+        autoOpenDelay: parseInt(readAttr(el, 'data-auto-open-delay', '800'), 10),
         ...overrides,
     };
 }
@@ -70,8 +70,8 @@ function buildConfig(el, overrides = {}) {
 // ── CSS INJECTION ─────────────────────────────────────────────────────────────
 function injectStyles(cfg) {
     if (document.getElementById('vs-widget-styles')) return;
-    const P  = cfg.primaryColor;
-    const S  = cfg.secondaryColor;
+    const P = cfg.primaryColor;
+    const S = cfg.secondaryColor;
     const BS = cfg.buttonSize;
 
     const css = `
@@ -155,13 +155,13 @@ function injectStyles(cfg) {
 
 // ── ICONS ─────────────────────────────────────────────────────────────────────
 const ICONS = {
-    sparkles:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>`,
-    user:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-    menu:      `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
-    close:     `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+    sparkles: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>`,
+    user: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    menu: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
+    close: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
     closeGray: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
-    send:      `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
-    chat:      `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+    send: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
+    chat: `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
 };
 
 function imgTag(url) {
@@ -172,29 +172,34 @@ function imgTag(url) {
 function createWidget(cfg) {
 
     // localStorage helpers
-    const STORAGE_KEY  = 'vs_messages';
+    const STORAGE_KEY = 'vs_messages';
     const MAX_MESSAGES = 200;
 
     function loadMessages() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (!raw) return [];
-            return JSON.parse(raw).map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
-        } catch { return []; }
+            return JSON.parse(raw).map(m => ({...m, timestamp: new Date(m.timestamp)}));
+        } catch {
+            return [];
+        }
     }
 
     function saveMessages(msgs) {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(
-                msgs.slice(-MAX_MESSAGES).map(m => ({ ...m, timestamp: m.timestamp.toISOString() }))
+                msgs.slice(-MAX_MESSAGES).map(m => ({...m, timestamp: m.timestamp.toISOString()}))
             ));
-        } catch { /* storage quota — silently ignore */ }
+        } catch { /* storage quota — silently ignore */
+        }
     }
 
-    function clearStoredMessages() { localStorage.removeItem(STORAGE_KEY); }
+    function clearStoredMessages() {
+        localStorage.removeItem(STORAGE_KEY);
+    }
 
     function buildApiMessages(msgs) {
-        return msgs.map(m => ({ role: m.isBot ? 'assistant' : 'user', content: m.text }));
+        return msgs.map(m => ({role: m.isBot ? 'assistant' : 'user', content: m.text}));
     }
 
     // device id
@@ -208,8 +213,8 @@ function createWidget(cfg) {
     }
 
     // state
-    let messages               = loadMessages();
-    let isTyping               = false;
+    let messages = loadMessages();
+    let isTyping = false;
     let hasStartedConversation = messages.some(m => !m.isBot);
 
     const DEFAULT_SUGGESTIONS = [
@@ -231,8 +236,8 @@ function createWidget(cfg) {
     }
 
     function formatTime(date) {
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-            ' at ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) +
+            ' at ' + date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'});
     }
 
     function scrollToBottom() {
@@ -241,7 +246,7 @@ function createWidget(cfg) {
     }
 
     function updateSendBtn() {
-        const btn   = document.getElementById('dharma-send-btn');
+        const btn = document.getElementById('dharma-send-btn');
         const input = document.getElementById('dharma-input');
         if (btn && input) btn.disabled = !input.value.trim() || isTyping;
     }
@@ -254,14 +259,14 @@ function createWidget(cfg) {
         const suggestions = document.getElementById('dharma-suggestions');
         if (suggestions && !msg.isBot) suggestions.remove();
 
-        const row    = document.createElement('div');
+        const row = document.createElement('div');
         row.className = `dharma-msg-row ${msg.isBot ? 'bot' : 'user'}`;
 
         const avatar = document.createElement('div');
         avatar.className = `dharma-msg-avatar ${msg.isBot ? 'bot' : 'user'}`;
         avatar.innerHTML = avatarHtml(msg.isBot);
 
-        const col    = document.createElement('div');
+        const col = document.createElement('div');
         col.className = `dharma-msg-col ${msg.isBot ? 'bot' : 'user'}`;
 
         const bubble = document.createElement('div');
@@ -269,14 +274,19 @@ function createWidget(cfg) {
         bubble.textContent = msg.text;
 
         const ts = document.createElement('div');
-        ts.className   = 'dharma-timestamp';
+        ts.className = 'dharma-timestamp';
         ts.textContent = formatTime(msg.timestamp);
 
         col.appendChild(bubble);
         col.appendChild(ts);
 
-        if (msg.isBot) { row.appendChild(avatar); row.appendChild(col); }
-        else           { row.appendChild(col);    row.appendChild(avatar); }
+        if (msg.isBot) {
+            row.appendChild(avatar);
+            row.appendChild(col);
+        } else {
+            row.appendChild(col);
+            row.appendChild(avatar);
+        }
 
         container.appendChild(row);
         scrollToBottom();
@@ -309,7 +319,7 @@ function createWidget(cfg) {
         const input = document.getElementById('dharma-input');
         if (input) input.value = '';
 
-        const userMsg = { id: String(Date.now()), text: text.trim(), isBot: false, timestamp: new Date() };
+        const userMsg = {id: String(Date.now()), text: text.trim(), isBot: false, timestamp: new Date()};
         messages.push(userMsg);
         saveMessages(messages);
         appendMessage(userMsg);
@@ -320,28 +330,33 @@ function createWidget(cfg) {
         showTyping();
 
         try {
-            const res  = await fetch(cfg.serverUrl, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ messages: buildApiMessages(messages) }),
+            const res = await fetch(cfg.serverUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({messages: buildApiMessages(messages)}),
             });
             const data = await res.json();
             hideTyping();
 
             const reply =
-                data.answer  ||
-                data.reply   ||
+                data.answer ||
+                data.reply ||
                 data.message ||
                 data.choices?.[0]?.message?.content ||
                 'Sorry, I could not find an answer.';
 
-            const botMsg = { id: String(Date.now() + 1), text: reply, isBot: true, timestamp: new Date() };
+            const botMsg = {id: String(Date.now() + 1), text: reply, isBot: true, timestamp: new Date()};
             messages.push(botMsg);
             saveMessages(messages);
             appendMessage(botMsg);
         } catch {
             hideTyping();
-            const errMsg = { id: String(Date.now() + 1), text: 'Sorry, something went wrong. Please try again.', isBot: true, timestamp: new Date() };
+            const errMsg = {
+                id: String(Date.now() + 1),
+                text: 'Sorry, something went wrong. Please try again.',
+                isBot: true,
+                timestamp: new Date()
+            };
             messages.push(errMsg);
             saveMessages(messages);
             appendMessage(errMsg);
@@ -360,7 +375,7 @@ function createWidget(cfg) {
         wrap.appendChild(label);
         SUGGESTIONS.forEach(t => {
             const btn = document.createElement('button');
-            btn.className   = 'dharma-suggestion-btn';
+            btn.className = 'dharma-suggestion-btn';
             btn.textContent = t;
             btn.addEventListener('click', () => sendMessage(t));
             wrap.appendChild(btn);
@@ -371,9 +386,9 @@ function createWidget(cfg) {
     // clear modal
     function openClearModal() {
         const overlay = document.createElement('div');
-        overlay.id    = 'dharma-modal-overlay';
-        const modal   = document.createElement('div');
-        modal.id      = 'dharma-modal';
+        overlay.id = 'dharma-modal-overlay';
+        const modal = document.createElement('div');
+        modal.id = 'dharma-modal';
         modal.innerHTML = `
             <button id="dharma-modal-close">${ICONS.closeGray}</button>
             <h3>Clear conversation</h3>
@@ -386,7 +401,9 @@ function createWidget(cfg) {
         document.body.appendChild(overlay);
 
         const close = () => overlay.remove();
-        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) close();
+        });
         modal.querySelector('.dharma-modal-cancel').addEventListener('click', close);
         modal.querySelector('#dharma-modal-close').addEventListener('click', close);
         modal.querySelector('.dharma-modal-confirm').addEventListener('click', () => {
@@ -394,7 +411,11 @@ function createWidget(cfg) {
             hasStartedConversation = false;
             clearStoredMessages();
             const c = document.getElementById('dharma-messages');
-            if (c) { c.innerHTML = ''; c.appendChild(renderSuggestions()); showWelcome(); }
+            if (c) {
+                c.innerHTML = '';
+                c.appendChild(renderSuggestions());
+                showWelcome();
+            }
             close();
         });
     }
@@ -402,7 +423,7 @@ function createWidget(cfg) {
     // greeting
     function showWelcome() {
         setTimeout(() => {
-            const w = { id: `welcome-${Date.now()}`, text: cfg.greetingMessage, isBot: true, timestamp: new Date() };
+            const w = {id: `welcome-${Date.now()}`, text: cfg.greetingMessage, isBot: true, timestamp: new Date()};
             messages.push(w);
             saveMessages(messages);
             appendMessage(w);
@@ -452,7 +473,7 @@ function createWidget(cfg) {
         document.getElementById('dharma-close-btn').addEventListener('click', closeChat);
         document.getElementById('dharma-menu-btn').addEventListener('click', openClearModal);
 
-        const input   = document.getElementById('dharma-input');
+        const input = document.getElementById('dharma-input');
         const sendBtn = document.getElementById('dharma-send-btn');
         input.addEventListener('input', updateSendBtn);
         input.addEventListener('keydown', e => {
@@ -492,7 +513,7 @@ function createWidget(cfg) {
         if (cfg.autoOpen) setTimeout(openChat, cfg.autoOpenDelay);
     }
 
-    return { mount, openChat, closeChat };
+    return {mount, openChat, closeChat};
 }
 
 // ── PUBLIC API (returned as VirstackAIWebChatUIWidget by esbuild --format=iife) ──
@@ -502,7 +523,7 @@ function createWidget(cfg) {
  *   VirstackAIWebChatUIWidget.init({ serverUrl: '...', primaryColor: '#fff' });
  */
 function init(overrides = {}) {
-    const cfg    = buildConfig(_scriptEl, overrides);
+    const cfg = buildConfig(_scriptEl, overrides);
     const widget = createWidget(cfg);
     widget.mount();
     return widget;
@@ -513,7 +534,7 @@ function init(overrides = {}) {
  * data-virstack-widget is present on the <script> tag.
  */
 function autoInit() {
-    const cfg    = buildConfig(_scriptEl);
+    const cfg = buildConfig(_scriptEl);
     const widget = createWidget(cfg);
 
     if (document.readyState === 'loading') {
@@ -531,4 +552,4 @@ function autoInit() {
 // When loaded directly as a plain <script> tag we assign it to window manually.
 autoInit();
 
-window.VirstackAIWebChatUIWidget = { init, autoInit, createWidget };
+window.VirstackAIWebChatUIWidget = {init, autoInit, createWidget};
