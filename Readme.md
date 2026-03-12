@@ -4,6 +4,10 @@ A lightweight, zero-dependency AI chat widget you can drop into any website with
 
 Built by [Virstack](https://virstack.com).
 
+## Preview
+
+![Alt text](assets/img.png)
+
 ---
 
 ## Features
