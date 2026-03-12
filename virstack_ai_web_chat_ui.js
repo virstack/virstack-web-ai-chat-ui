@@ -79,7 +79,7 @@ function injectStyles(cfg) {
 #dharma-bubble:hover{transform:scale(1.1)}
 #dharma-bubble:active{transform:scale(.95)}
 #dharma-bubble-dot{position:absolute;top:4px;right:4px;width:12px;height:12px;border-radius:50%;background:${S};animation:dharma-pulse 2s ease-in-out infinite;}
-#dharma-window{position:fixed;bottom:100px;right:24px;width:384px;height:600px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.2);display:flex;flex-direction:column;z-index:99999;overflow:hidden;animation:dharma-open .3s cubic-bezier(.34,1.56,.64,1) both;}
+#dharma-window{position:fixed;bottom:45px;right:24px;width:384px;height:600px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.2);display:flex;flex-direction:column;z-index:99999;overflow:hidden;animation:dharma-open .3s cubic-bezier(.34,1.56,.64,1) both;}
 #dharma-window.dharma-closing{animation:dharma-close .2s ease forwards}
 #dharma-header{background:${S};padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 #dharma-header-left{display:flex;align-items:center;gap:12px}
