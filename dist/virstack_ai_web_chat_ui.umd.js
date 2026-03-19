@@ -29,6 +29,26 @@ var VirstackAIWebChatUIWidget = (() => {
       ...overrides
     };
   }
+  var SILENT_ROLES = /* @__PURE__ */ new Set(["tool_use", "tool_result", "tool"]);
+  function isSilentTurn(turn) {
+    if (SILENT_ROLES.has(turn.role)) return true;
+    if (turn.role === "assistant" && typeof turn.content !== "string") return true;
+    return false;
+  }
+  function formatText(raw) {
+    let text = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    text = text.replace(/\\n/g, "\n");
+    text = text.replace(/`([^`\n]+?)`/g, '<code class="vs-code">$1</code>');
+    text = text.replace(/\*([^*\n]+?)\*/g, "<strong>$1</strong>");
+    text = text.replace(/_([^_\n]+?)_/g, "<em>$1</em>");
+    text = text.replace(/~([^~\n]+?)~/g, "<s>$1</s>");
+    text = text.replace(
+      /\bhttps?:\/\/[^\s<>"']+/g,
+      (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="vs-link">${url}</a>`
+    );
+    text = text.replace(/\n/g, "<br>");
+    return text;
+  }
   function injectStyles(cfg) {
     if (document.getElementById("vs-widget-styles")) return;
     const P = cfg.primaryColor;
@@ -66,9 +86,16 @@ var VirstackAIWebChatUIWidget = (() => {
 .dharma-msg-col{display:flex;flex-direction:column;max-width:75%}
 .dharma-msg-col.bot{align-items:flex-start}
 .dharma-msg-col.user{align-items:flex-end}
-.dharma-bubble-text{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.55;color:#fff;}
+.dharma-bubble-text{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;color:#fff;word-break:break-word;}
 .dharma-bubble-text.bot{background:${S};border-top-left-radius:4px}
 .dharma-bubble-text.user{background:${P};border-top-right-radius:4px}
+/* WhatsApp-style inline formatting inside bubbles */
+.dharma-bubble-text strong{font-weight:700}
+.dharma-bubble-text em{font-style:italic}
+.dharma-bubble-text s{text-decoration:line-through;opacity:.8}
+.dharma-bubble-text code.vs-code{font-family:monospace;font-size:12px;background:rgba(0,0,0,.18);padding:1px 5px;border-radius:4px;white-space:pre-wrap;}
+.dharma-bubble-text a.vs-link{color:rgba(255,255,255,.9);text-decoration:underline;text-underline-offset:2px;word-break:break-all;}
+.dharma-bubble-text a.vs-link:hover{color:#fff}
 .dharma-timestamp{font-size:11px;color:#9ca3af;margin-top:4px;padding:0 4px}
 #dharma-typing{display:flex;justify-content:flex-start;margin-bottom:14px}
 .dharma-typing-bubble{background:${S};border-radius:16px;border-top-left-radius:4px;padding:12px 16px;display:flex;gap:4px;align-items:center;}
@@ -147,7 +174,13 @@ var VirstackAIWebChatUIWidget = (() => {
       localStorage.removeItem(STORAGE_KEY);
     }
     function buildApiMessages(msgs) {
-      return msgs.map((m) => ({ role: m.isBot ? "assistant" : "user", content: m.text }));
+      return msgs.map((m) => {
+        if (m.role) {
+          const { id, timestamp, isBot, text, ...apiFields } = m;
+          return apiFields;
+        }
+        return { role: m.isBot ? "assistant" : "user", content: m.text };
+      });
     }
     let deviceId = localStorage.getItem("vs_device_id");
     if (!deviceId) {
@@ -159,7 +192,7 @@ var VirstackAIWebChatUIWidget = (() => {
     }
     let messages = loadMessages();
     let isTyping = false;
-    let hasStartedConversation = messages.some((m) => !m.isBot);
+    let hasStartedConversation = messages.some((m) => !m.isBot && !m.role);
     const DEFAULT_SUGGESTIONS = [
       "How do I start meditating?",
       "Tell me about meditation types"
@@ -179,33 +212,42 @@ var VirstackAIWebChatUIWidget = (() => {
       const el = document.getElementById("dharma-messages");
       if (el) el.scrollTop = el.scrollHeight;
     }
+    function scrollToMessageTop(rowEl) {
+      const container = document.getElementById("dharma-messages");
+      if (!container || !rowEl) return;
+      container.scrollTop = rowEl.offsetTop - container.offsetTop - 8;
+    }
     function updateSendBtn() {
       const btn = document.getElementById("dharma-send-btn");
       const input = document.getElementById("dharma-input");
       if (btn && input) btn.disabled = !input.value.trim() || isTyping;
     }
     function appendMessage(msg) {
+      if (msg.role && SILENT_ROLES.has(msg.role)) return;
+      if (msg.role === "assistant" && !msg.text && !msg.content) return;
       const container = document.getElementById("dharma-messages");
       if (!container) return;
       const suggestions = document.getElementById("dharma-suggestions");
       if (suggestions && !msg.isBot) suggestions.remove();
+      const isBot = msg.isBot || msg.role === "assistant";
       const row = document.createElement("div");
-      row.className = `dharma-msg-row ${msg.isBot ? "bot" : "user"}`;
+      row.className = `dharma-msg-row ${isBot ? "bot" : "user"}`;
       const avatar = document.createElement("div");
-      avatar.className = `dharma-msg-avatar ${msg.isBot ? "bot" : "user"}`;
-      avatar.innerHTML = avatarHtml(msg.isBot);
+      avatar.className = `dharma-msg-avatar ${isBot ? "bot" : "user"}`;
+      avatar.innerHTML = avatarHtml(isBot);
       const col = document.createElement("div");
-      col.className = `dharma-msg-col ${msg.isBot ? "bot" : "user"}`;
+      col.className = `dharma-msg-col ${isBot ? "bot" : "user"}`;
       const bubble = document.createElement("div");
-      bubble.className = `dharma-bubble-text ${msg.isBot ? "bot" : "user"}`;
-      bubble.innerHTML = msg.text.replace(/\n/g, "<br>");
-      ;
+      bubble.className = `dharma-bubble-text ${isBot ? "bot" : "user"}`;
+      const rawText = msg.text || (typeof msg.content === "string" ? msg.content : "");
+      if (!rawText || !rawText.trim()) return;
+      bubble.innerHTML = formatText(rawText);
       const ts = document.createElement("div");
       ts.className = "dharma-timestamp";
-      ts.textContent = formatTime(msg.timestamp);
+      ts.textContent = formatTime(msg.timestamp || /* @__PURE__ */ new Date());
       col.appendChild(bubble);
       col.appendChild(ts);
-      if (msg.isBot) {
+      if (isBot) {
         row.appendChild(avatar);
         row.appendChild(col);
       } else {
@@ -213,7 +255,11 @@ var VirstackAIWebChatUIWidget = (() => {
         row.appendChild(avatar);
       }
       container.appendChild(row);
-      scrollToBottom();
+      if (isBot) {
+        scrollToMessageTop(row);
+      } else {
+        scrollToBottom();
+      }
     }
     function showTyping() {
       const c = document.getElementById("dharma-messages");
@@ -236,7 +282,12 @@ var VirstackAIWebChatUIWidget = (() => {
       if (!text || !text.trim() || isTyping) return;
       const input = document.getElementById("dharma-input");
       if (input) input.value = "";
-      const userMsg = { id: String(Date.now()), text: text.trim(), isBot: false, timestamp: /* @__PURE__ */ new Date() };
+      const userMsg = {
+        id: String(Date.now()),
+        text: text.trim(),
+        isBot: false,
+        timestamp: /* @__PURE__ */ new Date()
+      };
       messages.push(userMsg);
       saveMessages(messages);
       appendMessage(userMsg);
@@ -244,20 +295,50 @@ var VirstackAIWebChatUIWidget = (() => {
       isTyping = true;
       updateSendBtn();
       showTyping();
+      const sentCount = buildApiMessages(messages).length;
       try {
         const res = await fetch(cfg.serverUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone
+          },
           body: JSON.stringify({ messages: buildApiMessages(messages) })
         });
         const data = await res.json();
         hideTyping();
-        const reply = data.answer || data.reply || data.message || data.choices?.[0]?.message?.content || "Sorry, I could not find an answer.";
-        const formattedReply = reply.replace(/\\n/g, "\n");
-        const botMsg = { id: String(Date.now() + 1), text: formattedReply, isBot: true, timestamp: /* @__PURE__ */ new Date() };
-        messages.push(botMsg);
-        saveMessages(messages);
-        appendMessage(botMsg);
+        const incomingArray = Array.isArray(data) ? data : Array.isArray(data.messages) ? data.messages : null;
+        if (incomingArray && incomingArray.length > 0) {
+          const incoming = incomingArray;
+          const newTurns = incoming.slice(sentCount);
+          for (const turn of newTurns) {
+            const isSilent = isSilentTurn(turn);
+            const msg = isSilent ? {
+              ...turn,
+              id: String(Date.now() + Math.random()),
+              timestamp: /* @__PURE__ */ new Date()
+            } : {
+              id: String(Date.now() + Math.random()),
+              text: typeof turn.content === "string" ? turn.content : JSON.stringify(turn.content),
+              isBot: turn.role === "assistant",
+              timestamp: /* @__PURE__ */ new Date()
+            };
+            messages.push(msg);
+            appendMessage(msg);
+          }
+          saveMessages(messages);
+        } else {
+          const reply = data.answer || data.reply || data.message || data.choices?.[0]?.message?.content || "Sorry, I could not find an answer.";
+          const botMsg = {
+            id: String(Date.now() + 1),
+            text: reply,
+            isBot: true,
+            timestamp: /* @__PURE__ */ new Date()
+          };
+          messages.push(botMsg);
+          saveMessages(messages);
+          appendMessage(botMsg);
+        }
       } catch {
         hideTyping();
         const errMsg = {
@@ -324,7 +405,12 @@ var VirstackAIWebChatUIWidget = (() => {
     }
     function showWelcome() {
       setTimeout(() => {
-        const w = { id: `welcome-${Date.now()}`, text: cfg.greetingMessage, isBot: true, timestamp: /* @__PURE__ */ new Date() };
+        const w = {
+          id: `welcome-${Date.now()}`,
+          text: cfg.greetingMessage,
+          isBot: true,
+          timestamp: /* @__PURE__ */ new Date()
+        };
         messages.push(w);
         saveMessages(messages);
         appendMessage(w);

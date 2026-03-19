@@ -28,13 +28,21 @@
  *
  * Usage (manual init):
  *   VirstackAIWebChatUIWidget.init({ serverUrl: '...', primaryColor: '...' });
+ *
+ * ── CHANGELOG ────────────────────────────────────────────────────────────────
+ * v2.0.0
+ *   1. WhatsApp-style text formatting
+ *      *bold*, _italic_, ~strikethrough~, `code`, URLs auto-linked
+ *   2. Backend may now return a full messages array
+ *      { messages: [{ role, content }] } — all new assistant/user turns are
+ *      appended; tool_use / tool_result turns are stored silently (not shown).
+ *   3. Tool-result messages are never rendered in the chat bubble list but are
+ *      kept in the outgoing messages array so the backend keeps full context.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IMPORTANT: capture the <script> element HERE, at module parse time.
-// esbuild --format=iife wraps everything in its own IIFE, which makes
-// document.currentScript null inside any function. Capturing it at the
-// top level of the module (before esbuild's wrapper runs) is the fix.
+// Capture <script> element at module parse time (esbuild IIFE workaround)
 // ─────────────────────────────────────────────────────────────────────────────
 const _scriptEl = document.currentScript ||
     (() => {
@@ -50,28 +58,92 @@ function readAttr(el, name, fallback) {
 
 function buildConfig(el, overrides = {}) {
     return {
-        primaryColor: readAttr(el, 'data-primary-color', '#D68B4B'),
-        secondaryColor: readAttr(el, 'data-secondary-color', '#324A6D'),
-        serverUrl: readAttr(el, 'data-server-url', 'http://localhost:8000'),
-        iconUrl: readAttr(el, 'data-icon-url', ''),
-        buttonSize: parseInt(readAttr(el, 'data-button-size', '64'), 10),
-        title: readAttr(el, 'data-title', 'Chat Assistant'),
-        statusText: readAttr(el, 'data-status-text', 'Always here for you'),
-        placeholder: readAttr(el, 'data-placeholder', 'Ask me anything...'),
+        primaryColor:    readAttr(el, 'data-primary-color',    '#D68B4B'),
+        secondaryColor:  readAttr(el, 'data-secondary-color',  '#324A6D'),
+        serverUrl:       readAttr(el, 'data-server-url',       'http://localhost:8000'),
+        iconUrl:         readAttr(el, 'data-icon-url',         ''),
+        buttonSize:      parseInt(readAttr(el, 'data-button-size', '64'), 10),
+        title:           readAttr(el, 'data-title',            'Chat Assistant'),
+        statusText:      readAttr(el, 'data-status-text',      'Always here for you'),
+        placeholder:     readAttr(el, 'data-placeholder',      'Ask me anything...'),
         greetingMessage: readAttr(el, 'data-greeting-message',
             "Hello! \uD83D\uDC4B I'm here to help. How can I assist you today?"),
-        suggestions: readAttr(el, 'data-suggestions', ''),
-        autoOpen: readAttr(el, 'data-auto-open', 'true') !== 'false',
-        autoOpenDelay: parseInt(readAttr(el, 'data-auto-open-delay', '800'), 10),
+        suggestions:     readAttr(el, 'data-suggestions',      ''),
+        autoOpen:        readAttr(el, 'data-auto-open',        'true') !== 'false',
+        autoOpenDelay:   parseInt(readAttr(el, 'data-auto-open-delay', '800'), 10),
         ...overrides,
     };
+}
+
+// ── TEXT FORMATTING (WhatsApp style) ─────────────────────────────────────────
+/**
+ * Roles that should NEVER be rendered as visible chat bubbles.
+ * They are stored in the messages array so the backend keeps full context.
+ */
+const SILENT_ROLES = new Set(['tool_use', 'tool_result', 'tool']);
+
+// Returns true if a raw turn from the backend should be stored silently (no bubble).
+function isSilentTurn(turn) {
+    // Explicit tool roles
+    if (SILENT_ROLES.has(turn.role)) return true;
+    // Assistant turns where content is not a plain string (tool_use blocks
+    // use an array of content objects, not a string — nothing to display)
+    if (turn.role === 'assistant' && typeof turn.content !== 'string') return true;
+    return false;
+}
+
+/**
+ * Convert raw assistant/user text to safe HTML with WhatsApp-style markup.
+ *
+ * Supported syntax:
+ *   *bold*          → <strong>
+ *   _italic_        → <em>
+ *   ~strikethrough~ → <s>
+ *   `inline code`   → <code>
+ *   URLs            → <a href="…" target="_blank">
+ *   \n              → <br>
+ */
+function formatText(raw) {
+    // 1. Escape HTML entities to prevent XSS
+    let text = raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    // 2. Literal "\n" sequences (escaped newlines from JSON) → real newlines
+    text = text.replace(/\\n/g, '\n');
+
+    // 3. WhatsApp inline formatting (order matters: code first to avoid re-processing)
+    // Inline code  `…`
+    text = text.replace(/`([^`\n]+?)`/g, '<code class="vs-code">$1</code>');
+
+    // Bold  *…*  (not inside code spans — safe because code spans were already replaced)
+    text = text.replace(/\*([^*\n]+?)\*/g, '<strong>$1</strong>');
+
+    // Italic  _…_
+    text = text.replace(/_([^_\n]+?)_/g, '<em>$1</em>');
+
+    // Strikethrough  ~…~
+    text = text.replace(/~([^~\n]+?)~/g, '<s>$1</s>');
+
+    // 4. Auto-link URLs  (http / https)
+    text = text.replace(
+        /\bhttps?:\/\/[^\s<>"']+/g,
+        url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="vs-link">${url}</a>`
+    );
+
+    // 5. Newlines → <br>
+    text = text.replace(/\n/g, '<br>');
+
+    return text;
 }
 
 // ── CSS INJECTION ─────────────────────────────────────────────────────────────
 function injectStyles(cfg) {
     if (document.getElementById('vs-widget-styles')) return;
-    const P = cfg.primaryColor;
-    const S = cfg.secondaryColor;
+    const P  = cfg.primaryColor;
+    const S  = cfg.secondaryColor;
     const BS = cfg.buttonSize;
 
     const css = `
@@ -106,9 +178,16 @@ function injectStyles(cfg) {
 .dharma-msg-col{display:flex;flex-direction:column;max-width:75%}
 .dharma-msg-col.bot{align-items:flex-start}
 .dharma-msg-col.user{align-items:flex-end}
-.dharma-bubble-text{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.55;color:#fff;}
+.dharma-bubble-text{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;color:#fff;word-break:break-word;}
 .dharma-bubble-text.bot{background:${S};border-top-left-radius:4px}
 .dharma-bubble-text.user{background:${P};border-top-right-radius:4px}
+/* WhatsApp-style inline formatting inside bubbles */
+.dharma-bubble-text strong{font-weight:700}
+.dharma-bubble-text em{font-style:italic}
+.dharma-bubble-text s{text-decoration:line-through;opacity:.8}
+.dharma-bubble-text code.vs-code{font-family:monospace;font-size:12px;background:rgba(0,0,0,.18);padding:1px 5px;border-radius:4px;white-space:pre-wrap;}
+.dharma-bubble-text a.vs-link{color:rgba(255,255,255,.9);text-decoration:underline;text-underline-offset:2px;word-break:break-all;}
+.dharma-bubble-text a.vs-link:hover{color:#fff}
 .dharma-timestamp{font-size:11px;color:#9ca3af;margin-top:4px;padding:0 4px}
 #dharma-typing{display:flex;justify-content:flex-start;margin-bottom:14px}
 .dharma-typing-bubble{background:${S};border-radius:16px;border-top-left-radius:4px;padding:12px 16px;display:flex;gap:4px;align-items:center;}
@@ -155,13 +234,13 @@ function injectStyles(cfg) {
 
 // ── ICONS ─────────────────────────────────────────────────────────────────────
 const ICONS = {
-    sparkles: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>`,
-    user: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-    menu: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
-    close: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+    sparkles:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>`,
+    user:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    menu:      `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
+    close:     `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
     closeGray: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
-    send: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
-    chat: `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+    send:      `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
+    chat:      `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
 };
 
 function imgTag(url) {
@@ -171,15 +250,15 @@ function imgTag(url) {
 // ── WIDGET FACTORY ────────────────────────────────────────────────────────────
 function createWidget(cfg) {
 
-    // localStorage helpers
-    const STORAGE_KEY = 'vs_messages';
+    // ── localStorage helpers ──────────────────────────────────────────────────
+    const STORAGE_KEY  = 'vs_messages';
     const MAX_MESSAGES = 200;
 
     function loadMessages() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (!raw) return [];
-            return JSON.parse(raw).map(m => ({...m, timestamp: new Date(m.timestamp)}));
+            return JSON.parse(raw).map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
         } catch {
             return [];
         }
@@ -188,21 +267,34 @@ function createWidget(cfg) {
     function saveMessages(msgs) {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(
-                msgs.slice(-MAX_MESSAGES).map(m => ({...m, timestamp: m.timestamp.toISOString()}))
+                msgs.slice(-MAX_MESSAGES).map(m => ({ ...m, timestamp: m.timestamp.toISOString() }))
             ));
-        } catch { /* storage quota — silently ignore */
-        }
+        } catch { /* storage quota — silently ignore */ }
     }
 
     function clearStoredMessages() {
         localStorage.removeItem(STORAGE_KEY);
     }
 
+    // ── API message serialiser ────────────────────────────────────────────────
+    /**
+     * Build the outgoing messages array.
+     * ALL messages (including tool_use / tool_result) are forwarded so the
+     * backend retains full context — they are simply never rendered in the UI.
+     */
     function buildApiMessages(msgs) {
-        return msgs.map(m => ({role: m.isBot ? 'assistant' : 'user', content: m.text}));
+        return msgs.map(m => {
+            // Silent/tool messages were stored as a spread of the original turn —
+            // reconstruct the full API object, excluding internal widget fields.
+            if (m.role) {
+                const { id, timestamp, isBot, text, ...apiFields } = m;
+                return apiFields;
+            }
+            return { role: m.isBot ? 'assistant' : 'user', content: m.text };
+        });
     }
 
-    // device id
+    // ── device id ─────────────────────────────────────────────────────────────
     let deviceId = localStorage.getItem('vs_device_id');
     if (!deviceId) {
         deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -212,20 +304,20 @@ function createWidget(cfg) {
         localStorage.setItem('vs_device_id', deviceId);
     }
 
-    // state
+    // ── state ─────────────────────────────────────────────────────────────────
     let messages = loadMessages();
     let isTyping = false;
-    let hasStartedConversation = messages.some(m => !m.isBot);
+    let hasStartedConversation = messages.some(m => !m.isBot && !m.role);
 
     const DEFAULT_SUGGESTIONS = [
-        "How do I start meditating?",
-        "Tell me about meditation types",
+        'How do I start meditating?',
+        'Tell me about meditation types',
     ];
     const SUGGESTIONS = cfg.suggestions
         ? cfg.suggestions.split(',').map(s => s.trim()).filter(Boolean)
         : DEFAULT_SUGGESTIONS;
 
-    // helpers
+    // ── helpers ───────────────────────────────────────────────────────────────
     function avatarHtml(isBot) {
         if (isBot && cfg.iconUrl) return imgTag(cfg.iconUrl);
         return isBot ? ICONS.sparkles : ICONS.user;
@@ -236,8 +328,8 @@ function createWidget(cfg) {
     }
 
     function formatTime(date) {
-        return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) +
-            ' at ' + date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'});
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+            ' at ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     }
 
     function scrollToBottom() {
@@ -245,42 +337,63 @@ function createWidget(cfg) {
         if (el) el.scrollTop = el.scrollHeight;
     }
 
+    // Scroll so the TOP of the new bot message row is visible,
+    // giving the user a natural reading start point.
+    function scrollToMessageTop(rowEl) {
+        const container = document.getElementById('dharma-messages');
+        if (!container || !rowEl) return;
+        // Use scrollTop so the row's top lands just inside the container
+        container.scrollTop = rowEl.offsetTop - container.offsetTop - 8;
+    }
+
     function updateSendBtn() {
-        const btn = document.getElementById('dharma-send-btn');
+        const btn   = document.getElementById('dharma-send-btn');
         const input = document.getElementById('dharma-input');
         if (btn && input) btn.disabled = !input.value.trim() || isTyping;
     }
 
-    // render
+    // ── render ────────────────────────────────────────────────────────────────
     function appendMessage(msg) {
+        // Never render tool roles or null-content assistant turns (tool_use blocks)
+        if (msg.role && SILENT_ROLES.has(msg.role)) return;
+        if (msg.role === 'assistant' && !msg.text && !msg.content) return;
+
         const container = document.getElementById('dharma-messages');
         if (!container) return;
 
         const suggestions = document.getElementById('dharma-suggestions');
         if (suggestions && !msg.isBot) suggestions.remove();
 
+        const isBot = msg.isBot || msg.role === 'assistant';
+
         const row = document.createElement('div');
-        row.className = `dharma-msg-row ${msg.isBot ? 'bot' : 'user'}`;
+        row.className = `dharma-msg-row ${isBot ? 'bot' : 'user'}`;
 
         const avatar = document.createElement('div');
-        avatar.className = `dharma-msg-avatar ${msg.isBot ? 'bot' : 'user'}`;
-        avatar.innerHTML = avatarHtml(msg.isBot);
+        avatar.className = `dharma-msg-avatar ${isBot ? 'bot' : 'user'}`;
+        avatar.innerHTML = avatarHtml(isBot);
 
         const col = document.createElement('div');
-        col.className = `dharma-msg-col ${msg.isBot ? 'bot' : 'user'}`;
+        col.className = `dharma-msg-col ${isBot ? 'bot' : 'user'}`;
 
         const bubble = document.createElement('div');
-        bubble.className = `dharma-bubble-text ${msg.isBot ? 'bot' : 'user'}`;
-        bubble.innerHTML = msg.text.replace(/\n/g, '<br>');;
+        bubble.className = `dharma-bubble-text ${isBot ? 'bot' : 'user'}`;
+
+        // ── [CHANGE 1] Apply WhatsApp-style formatting ─────────────────────
+        const rawText = msg.text || (typeof msg.content === 'string' ? msg.content : '');
+        // Skip rendering if there is no displayable text (e.g. tool_use assistant turns
+        // where content is null, or tool_result turns that slipped through)
+        if (!rawText || !rawText.trim()) return;
+        bubble.innerHTML = formatText(rawText);
 
         const ts = document.createElement('div');
         ts.className = 'dharma-timestamp';
-        ts.textContent = formatTime(msg.timestamp);
+        ts.textContent = formatTime(msg.timestamp || new Date());
 
         col.appendChild(bubble);
         col.appendChild(ts);
 
-        if (msg.isBot) {
+        if (isBot) {
             row.appendChild(avatar);
             row.appendChild(col);
         } else {
@@ -289,10 +402,17 @@ function createWidget(cfg) {
         }
 
         container.appendChild(row);
-        scrollToBottom();
+
+        // For bot messages: scroll so the TOP of the new bubble is visible.
+        // For user messages: scroll to bottom so the typing indicator stays in view.
+        if (isBot) {
+            scrollToMessageTop(row);
+        } else {
+            scrollToBottom();
+        }
     }
 
-    // typing
+    // ── typing indicator ──────────────────────────────────────────────────────
     function showTyping() {
         const c = document.getElementById('dharma-messages');
         if (!c) return;
@@ -312,14 +432,19 @@ function createWidget(cfg) {
         if (el) el.remove();
     }
 
-    // send → POST { messages: [] }
+    // ── send → POST { messages: [] } ─────────────────────────────────────────
     async function sendMessage(text) {
         if (!text || !text.trim() || isTyping) return;
 
         const input = document.getElementById('dharma-input');
         if (input) input.value = '';
 
-        const userMsg = {id: String(Date.now()), text: text.trim(), isBot: false, timestamp: new Date()};
+        const userMsg = {
+            id:        String(Date.now()),
+            text:      text.trim(),
+            isBot:     false,
+            timestamp: new Date(),
+        };
         messages.push(userMsg);
         saveMessages(messages);
         appendMessage(userMsg);
@@ -329,35 +454,87 @@ function createWidget(cfg) {
         updateSendBtn();
         showTyping();
 
+        // Record how many messages we sent so we can skip them in the response.
+        // The backend echoes back the full history including what we sent, so
+        // everything at index >= sentCount is genuinely new.
+        const sentCount = buildApiMessages(messages).length;
+
         try {
-            const res = await fetch(cfg.serverUrl, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({messages: buildApiMessages(messages)}),
+            const res  = await fetch(cfg.serverUrl, {
+                method:  'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Timezone':   Intl.DateTimeFormat().resolvedOptions().timeZone,
+                },
+                body:    JSON.stringify({ messages: buildApiMessages(messages) }),
             });
             const data = await res.json();
             hideTyping();
 
-            const reply =
-                data.answer ||
-                data.reply ||
-                data.message ||
-                data.choices?.[0]?.message?.content ||
-                'Sorry, I could not find an answer.';
+            // ── [CHANGE 2] Full messages array support ────────────────────────
+            // Backend may return either:
+            //   a) a top-level array:   [ {role, content}, ... ]
+            //   b) a wrapped object:    { messages: [ {role, content}, ... ] }
+            const incomingArray = Array.isArray(data)
+                ? data
+                : (Array.isArray(data.messages) ? data.messages : null);
 
-            const formattedReply = reply.replace(/\\n/g, '\n');
+            if (incomingArray && incomingArray.length > 0) {
+                // Backend returned the full conversation history.
+                // Skip the first `sentCount` entries — those are what we sent.
+                // Everything beyond that is new (tool calls, assistant replies, etc).
+                const incoming = incomingArray;
+                const newTurns = incoming.slice(sentCount);
+                for (const turn of newTurns) {
+                    const isSilent = isSilentTurn(turn);
+                    // For silent turns (tool_use, tool_result, tool, null-content
+                    // assistant) we preserve the ENTIRE original turn so every field
+                    // (tool_calls, tool_call_id, name, etc.) round-trips to the backend.
+                    const msg = isSilent ? {
+                        ...turn,
+                        id:        String(Date.now() + Math.random()),
+                        timestamp: new Date(),
+                    } : {
+                        id:        String(Date.now() + Math.random()),
+                        text:      typeof turn.content === 'string'
+                            ? turn.content
+                            : JSON.stringify(turn.content),
+                        isBot:     turn.role === 'assistant',
+                        timestamp: new Date(),
+                    };
+                    messages.push(msg);
+                    // appendMessage skips silent roles automatically
+                    appendMessage(msg);
+                }
+                saveMessages(messages);
 
-            const botMsg = {id: String(Date.now() + 1), text: formattedReply, isBot: true, timestamp: new Date()};
-            messages.push(botMsg);
-            saveMessages(messages);
-            appendMessage(botMsg);
+            } else {
+                // ── Legacy single-reply support ───────────────────────────────
+                const reply =
+                    data.answer  ||
+                    data.reply   ||
+                    data.message ||
+                    data.choices?.[0]?.message?.content ||
+                    'Sorry, I could not find an answer.';
+
+                const botMsg = {
+                    id:        String(Date.now() + 1),
+                    text:      reply,
+                    isBot:     true,
+                    timestamp: new Date(),
+                };
+                messages.push(botMsg);
+                saveMessages(messages);
+                appendMessage(botMsg);
+            }
+
         } catch {
             hideTyping();
             const errMsg = {
-                id: String(Date.now() + 1),
-                text: 'Sorry, something went wrong. Please try again.',
-                isBot: true,
-                timestamp: new Date()
+                id:        String(Date.now() + 1),
+                text:      'Sorry, something went wrong. Please try again.',
+                isBot:     true,
+                timestamp: new Date(),
             };
             messages.push(errMsg);
             saveMessages(messages);
@@ -368,16 +545,16 @@ function createWidget(cfg) {
         updateSendBtn();
     }
 
-    // suggestions
+    // ── suggestions ───────────────────────────────────────────────────────────
     function renderSuggestions() {
-        const wrap = document.createElement('div');
-        wrap.id = 'dharma-suggestions';
+        const wrap  = document.createElement('div');
+        wrap.id     = 'dharma-suggestions';
         const label = document.createElement('p');
         label.textContent = 'Try asking:';
         wrap.appendChild(label);
         SUGGESTIONS.forEach(t => {
             const btn = document.createElement('button');
-            btn.className = 'dharma-suggestion-btn';
+            btn.className   = 'dharma-suggestion-btn';
             btn.textContent = t;
             btn.addEventListener('click', () => sendMessage(t));
             wrap.appendChild(btn);
@@ -385,12 +562,12 @@ function createWidget(cfg) {
         return wrap;
     }
 
-    // clear modal
+    // ── clear modal ───────────────────────────────────────────────────────────
     function openClearModal() {
         const overlay = document.createElement('div');
-        overlay.id = 'dharma-modal-overlay';
-        const modal = document.createElement('div');
-        modal.id = 'dharma-modal';
+        overlay.id    = 'dharma-modal-overlay';
+        const modal   = document.createElement('div');
+        modal.id      = 'dharma-modal';
         modal.innerHTML = `
             <button id="dharma-modal-close">${ICONS.closeGray}</button>
             <h3>Clear conversation</h3>
@@ -403,9 +580,7 @@ function createWidget(cfg) {
         document.body.appendChild(overlay);
 
         const close = () => overlay.remove();
-        overlay.addEventListener('click', e => {
-            if (e.target === overlay) close();
-        });
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
         modal.querySelector('.dharma-modal-cancel').addEventListener('click', close);
         modal.querySelector('#dharma-modal-close').addEventListener('click', close);
         modal.querySelector('.dharma-modal-confirm').addEventListener('click', () => {
@@ -422,24 +597,29 @@ function createWidget(cfg) {
         });
     }
 
-    // greeting
+    // ── greeting ──────────────────────────────────────────────────────────────
     function showWelcome() {
         setTimeout(() => {
-            const w = {id: `welcome-${Date.now()}`, text: cfg.greetingMessage, isBot: true, timestamp: new Date()};
+            const w = {
+                id:        `welcome-${Date.now()}`,
+                text:      cfg.greetingMessage,
+                isBot:     true,
+                timestamp: new Date(),
+            };
             messages.push(w);
             saveMessages(messages);
             appendMessage(w);
         }, 600);
     }
 
-    // open / close
+    // ── open / close ──────────────────────────────────────────────────────────
     function openChat() {
         const bubble = document.getElementById('dharma-bubble');
         if (bubble) bubble.style.display = 'none';
         if (document.getElementById('dharma-window')) return;
 
         const win = document.createElement('div');
-        win.id = 'dharma-window';
+        win.id    = 'dharma-window';
         win.innerHTML = `
             <div id="dharma-header">
                 <div id="dharma-header-left">
@@ -475,7 +655,7 @@ function createWidget(cfg) {
         document.getElementById('dharma-close-btn').addEventListener('click', closeChat);
         document.getElementById('dharma-menu-btn').addEventListener('click', openClearModal);
 
-        const input = document.getElementById('dharma-input');
+        const input   = document.getElementById('dharma-input');
         const sendBtn = document.getElementById('dharma-send-btn');
         input.addEventListener('input', updateSendBtn);
         input.addEventListener('keydown', e => {
@@ -499,44 +679,35 @@ function createWidget(cfg) {
         }, 200);
     }
 
-    // bubble
+    // ── bubble ────────────────────────────────────────────────────────────────
     function buildBubble() {
         const btn = document.createElement('button');
-        btn.id = 'dharma-bubble';
+        btn.id    = 'dharma-bubble';
         btn.innerHTML = `${bubbleIcon()}<div id="dharma-bubble-dot"></div>`;
         btn.addEventListener('click', openChat);
         document.body.appendChild(btn);
     }
 
-    // mount
+    // ── mount ─────────────────────────────────────────────────────────────────
     function mount() {
         injectStyles(cfg);
         buildBubble();
         if (cfg.autoOpen) setTimeout(openChat, cfg.autoOpenDelay);
     }
 
-    return {mount, openChat, closeChat};
+    return { mount, openChat, closeChat };
 }
 
-// ── PUBLIC API (returned as VirstackAIWebChatUIWidget by esbuild --format=iife) ──
-
-/**
- * Manually initialise the widget, optionally overriding data-* values.
- *   VirstackAIWebChatUIWidget.init({ serverUrl: '...', primaryColor: '#fff' });
- */
+// ── PUBLIC API ────────────────────────────────────────────────────────────────
 function init(overrides = {}) {
-    const cfg = buildConfig(_scriptEl, overrides);
+    const cfg    = buildConfig(_scriptEl, overrides);
     const widget = createWidget(cfg);
     widget.mount();
     return widget;
 }
 
-/**
- * Auto-init from data-* attributes. Called automatically when
- * data-virstack-widget is present on the <script> tag.
- */
 function autoInit() {
-    const cfg = buildConfig(_scriptEl);
+    const cfg    = buildConfig(_scriptEl);
     const widget = createWidget(cfg);
 
     if (document.readyState === 'loading') {
@@ -548,10 +719,5 @@ function autoInit() {
     return widget;
 }
 
-// Always auto-init — works whether or not data-virstack-widget is present.
-// When built with esbuild (--format=iife --global-name=VirstackAIWebChatUIWidget)
-// the returned object becomes window.VirstackAIWebChatUIWidget automatically.
-// When loaded directly as a plain <script> tag we assign it to window manually.
 autoInit();
-
-window.VirstackAIWebChatUIWidget = {init, autoInit, createWidget};
+window.VirstackAIWebChatUIWidget = { init, autoInit, createWidget };
