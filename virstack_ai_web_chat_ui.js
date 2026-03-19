@@ -271,7 +271,7 @@ function createWidget(cfg) {
 
         const bubble = document.createElement('div');
         bubble.className = `dharma-bubble-text ${msg.isBot ? 'bot' : 'user'}`;
-        bubble.textContent = msg.text;
+        bubble.innerHTML = msg.text.replace(/\n/g, '<br>');;
 
         const ts = document.createElement('div');
         ts.className = 'dharma-timestamp';
@@ -345,7 +345,9 @@ function createWidget(cfg) {
                 data.choices?.[0]?.message?.content ||
                 'Sorry, I could not find an answer.';
 
-            const botMsg = {id: String(Date.now() + 1), text: reply, isBot: true, timestamp: new Date()};
+            const formattedReply = reply.replace(/\\n/g, '\n');
+
+            const botMsg = {id: String(Date.now() + 1), text: formattedReply, isBot: true, timestamp: new Date()};
             messages.push(botMsg);
             saveMessages(messages);
             appendMessage(botMsg);
