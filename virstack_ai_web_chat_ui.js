@@ -59,7 +59,9 @@ function readAttr(el, name, fallback) {
 function buildConfig(el, overrides = {}) {
     return {
         primaryColor:    readAttr(el, 'data-primary-color',    '#D68B4B'),
-        secondaryColor:  readAttr(el, 'data-secondary-color',  '#324A6D'),
+        secondaryColor:  readAttr(el, 'data-secondary-color',  '#3C444E'),
+        inputTextColor:  readAttr(el, 'data-input-text-color', '#000'),
+        botBgColor:    readAttr(el, 'data-bot-background-color',   '#70767d55'),
         serverUrl:       readAttr(el, 'data-server-url',       'http://localhost:8000'),
         iconUrl:         readAttr(el, 'data-icon-url',         ''),
         buttonSize:      parseInt(readAttr(el, 'data-button-size', '64'), 10),
@@ -145,6 +147,8 @@ function injectStyles(cfg) {
     const P  = cfg.primaryColor;
     const S  = cfg.secondaryColor;
     const BS = cfg.buttonSize;
+    const IT = cfg.inputTextColor;
+    const BT = cfg.botBgColor;
 
     const css = `
 #dharma-bubble{position:fixed;bottom:24px;right:24px;width:${BS}px;height:${BS}px;border-radius:50%;background:${P};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:99998;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .2s ease;}
@@ -178,16 +182,17 @@ function injectStyles(cfg) {
 .dharma-msg-col{display:flex;flex-direction:column;max-width:75%}
 .dharma-msg-col.bot{align-items:flex-start}
 .dharma-msg-col.user{align-items:flex-end}
-.dharma-bubble-text{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;color:#fff;word-break:break-word;}
-.dharma-bubble-text.bot{background:${S};border-top-left-radius:4px}
+.dharma-bubble-text{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;color:#000;word-break:break-word;}
+.dharma-bubble-text.user{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;color:#fff;word-break:break-word;}
+.dharma-bubble-text.bot{background:${BT};border-top-left-radius:4px}
 .dharma-bubble-text.user{background:${P};border-top-right-radius:4px}
 /* WhatsApp-style inline formatting inside bubbles */
 .dharma-bubble-text strong{font-weight:700}
 .dharma-bubble-text em{font-style:italic}
 .dharma-bubble-text s{text-decoration:line-through;opacity:.8}
 .dharma-bubble-text code.vs-code{font-family:monospace;font-size:12px;background:rgba(0,0,0,.18);padding:1px 5px;border-radius:4px;white-space:pre-wrap;}
-.dharma-bubble-text a.vs-link{color:rgba(255,255,255,.9);text-decoration:underline;text-underline-offset:2px;word-break:break-all;}
-.dharma-bubble-text a.vs-link:hover{color:#fff}
+.dharma-bubble-text a.vs-link{color:#000;text-decoration:underline;text-underline-offset:2px;word-break:break-all;}
+.dharma-bubble-text a.vs-link:hover{color:#333}
 .dharma-timestamp{font-size:11px;color:#9ca3af;margin-top:4px;padding:0 4px}
 #dharma-typing{display:flex;justify-content:flex-start;margin-bottom:14px}
 .dharma-typing-bubble{background:${S};border-radius:16px;border-top-left-radius:4px;padding:12px 16px;display:flex;gap:4px;align-items:center;}
@@ -195,7 +200,7 @@ function injectStyles(cfg) {
 .dharma-dot:nth-child(2){animation-delay:.1s}
 .dharma-dot:nth-child(3){animation-delay:.2s}
 #dharma-input-area{padding:14px 16px;border-top:1px solid #e5e7eb;display:flex;gap:8px;flex-shrink:0;background:#fff;}
-#dharma-input{flex:1;padding:11px 14px;border-radius:12px;border:2px solid ${P};font-size:13px;color:${S};outline:none;background:#fff;transition:box-shadow .2s;font-family:inherit;}
+#dharma-input{flex:1;padding:11px 14px;border-radius:12px;border:2px solid ${P};font-size:13px;color:${IT};outline:none;background:#fff;transition:box-shadow .2s;font-family:inherit;}
 #dharma-input:focus{box-shadow:0 0 0 3px rgba(214,139,75,.15)}
 #dharma-input::placeholder{color:#9ca3af}
 #dharma-send-btn{width:46px;height:46px;border-radius:12px;background:${P};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .2s,transform .1s,box-shadow .2s;flex-shrink:0;}
