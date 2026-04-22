@@ -30,6 +30,9 @@
  *   VirstackAIWebChatUIWidget.init({ serverUrl: '...', primaryColor: '...' });
  *
  * ── CHANGELOG ────────────────────────────────────────────────────────────────
+ * v2.1.0
+ *   Shadow DOM isolation — all widget markup and styles are encapsulated inside
+ *   a shadow root so that WordPress (or any host-page) CSS cannot override them.
  * v2.0.0
  *   1. WhatsApp-style text formatting
  *      *bold*, _italic_, ~strikethrough~, `code`, URLs auto-linked
@@ -69,7 +72,7 @@ function buildConfig(el, overrides = {}) {
         statusText:      readAttr(el, 'data-status-text',      'Always here for you'),
         placeholder:     readAttr(el, 'data-placeholder',      'Ask me anything...'),
         greetingMessage: readAttr(el, 'data-greeting-message',
-            "Hello! \uD83D\uDC4B I'm here to help. How can I assist you today?"),
+            "Hello! 👋 I'm here to help. How can I assist you today?"),
         suggestions:     readAttr(el, 'data-suggestions',      ''),
         autoOpen:        readAttr(el, 'data-auto-open',        'true') !== 'false',
         autoOpenDelay:   parseInt(readAttr(el, 'data-auto-open-delay', '800'), 10),
@@ -142,8 +145,9 @@ function formatText(raw) {
 }
 
 // ── CSS INJECTION ─────────────────────────────────────────────────────────────
-function injectStyles(cfg) {
-    if (document.getElementById('vs-widget-styles')) return;
+// Injects styles into the widget's shadow root to prevent host-page CSS from
+// overriding the widget's appearance (e.g. WordPress themes).
+function injectStyles(cfg, root) {
     const P  = cfg.primaryColor;
     const S  = cfg.secondaryColor;
     const BS = cfg.buttonSize;
@@ -151,6 +155,8 @@ function injectStyles(cfg) {
     const BT = cfg.botBgColor;
 
     const css = `
+:host{all:initial;display:contents;}
+*,*::before,*::after{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 #dharma-bubble{position:fixed;bottom:24px;right:24px;width:${BS}px;height:${BS}px;border-radius:50%;background:${P};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:99998;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .2s ease;}
 #dharma-bubble:hover{transform:scale(1.1)}
 #dharma-bubble:active{transform:scale(.95)}
@@ -186,7 +192,6 @@ function injectStyles(cfg) {
 .dharma-bubble-text.user{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;color:#fff;word-break:break-word;}
 .dharma-bubble-text.bot{background:${BT};border-top-left-radius:4px}
 .dharma-bubble-text.user{background:${P};border-top-right-radius:4px}
-/* WhatsApp-style inline formatting inside bubbles */
 .dharma-bubble-text strong{font-weight:700}
 .dharma-bubble-text em{font-style:italic}
 .dharma-bubble-text s{text-decoration:line-through;opacity:.8}
@@ -232,9 +237,8 @@ function injectStyles(cfg) {
 }`;
 
     const style = document.createElement('style');
-    style.id = 'vs-widget-styles';
     style.textContent = css;
-    document.head.appendChild(style);
+    root.appendChild(style);
 }
 
 // ── ICONS ─────────────────────────────────────────────────────────────────────
@@ -254,6 +258,10 @@ function imgTag(url) {
 
 // ── WIDGET FACTORY ────────────────────────────────────────────────────────────
 function createWidget(cfg) {
+
+    // Shadow root is set in mount() — all DOM queries go through $id()
+    let shadowRoot = null;
+    function $id(id) { return shadowRoot ? shadowRoot.querySelector('#' + id) : null; }
 
     // ── localStorage helpers ──────────────────────────────────────────────────
     const STORAGE_KEY  = 'vs_messages';
@@ -338,22 +346,22 @@ function createWidget(cfg) {
     }
 
     function scrollToBottom() {
-        const el = document.getElementById('dharma-messages');
+        const el = $id('dharma-messages');
         if (el) el.scrollTop = el.scrollHeight;
     }
 
     // Scroll so the TOP of the new bot message row is visible,
     // giving the user a natural reading start point.
     function scrollToMessageTop(rowEl) {
-        const container = document.getElementById('dharma-messages');
+        const container = $id('dharma-messages');
         if (!container || !rowEl) return;
         // Use scrollTop so the row's top lands just inside the container
         container.scrollTop = rowEl.offsetTop - container.offsetTop - 8;
     }
 
     function updateSendBtn() {
-        const btn   = document.getElementById('dharma-send-btn');
-        const input = document.getElementById('dharma-input');
+        const btn   = $id('dharma-send-btn');
+        const input = $id('dharma-input');
         if (btn && input) btn.disabled = !input.value.trim() || isTyping;
     }
 
@@ -363,10 +371,10 @@ function createWidget(cfg) {
         if (msg.role && SILENT_ROLES.has(msg.role)) return;
         if (msg.role === 'assistant' && !msg.text && !msg.content) return;
 
-        const container = document.getElementById('dharma-messages');
+        const container = $id('dharma-messages');
         if (!container) return;
 
-        const suggestions = document.getElementById('dharma-suggestions');
+        const suggestions = $id('dharma-suggestions');
         if (suggestions && !msg.isBot) suggestions.remove();
 
         const isBot = msg.isBot || msg.role === 'assistant';
@@ -384,7 +392,6 @@ function createWidget(cfg) {
         const bubble = document.createElement('div');
         bubble.className = `dharma-bubble-text ${isBot ? 'bot' : 'user'}`;
 
-        // ── [CHANGE 1] Apply WhatsApp-style formatting ─────────────────────
         const rawText = msg.text || (typeof msg.content === 'string' ? msg.content : '');
         // Skip rendering if there is no displayable text (e.g. tool_use assistant turns
         // where content is null, or tool_result turns that slipped through)
@@ -419,7 +426,7 @@ function createWidget(cfg) {
 
     // ── typing indicator ──────────────────────────────────────────────────────
     function showTyping() {
-        const c = document.getElementById('dharma-messages');
+        const c = $id('dharma-messages');
         if (!c) return;
         const el = document.createElement('div');
         el.id = 'dharma-typing';
@@ -433,7 +440,7 @@ function createWidget(cfg) {
     }
 
     function hideTyping() {
-        const el = document.getElementById('dharma-typing');
+        const el = $id('dharma-typing');
         if (el) el.remove();
     }
 
@@ -441,7 +448,7 @@ function createWidget(cfg) {
     async function sendMessage(text) {
         if (!text || !text.trim() || isTyping) return;
 
-        const input = document.getElementById('dharma-input');
+        const input = $id('dharma-input');
         if (input) input.value = '';
 
         const userMsg = {
@@ -476,7 +483,6 @@ function createWidget(cfg) {
             const data = await res.json();
             hideTyping();
 
-            // ── [CHANGE 2] Full messages array support ────────────────────────
             // Backend may return either:
             //   a) a top-level array:   [ {role, content}, ... ]
             //   b) a wrapped object:    { messages: [ {role, content}, ... ] }
@@ -582,7 +588,7 @@ function createWidget(cfg) {
                 <button class="dharma-modal-confirm">Clear</button>
             </div>`;
         overlay.appendChild(modal);
-        document.body.appendChild(overlay);
+        shadowRoot.appendChild(overlay);
 
         const close = () => overlay.remove();
         overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
@@ -592,7 +598,7 @@ function createWidget(cfg) {
             messages = [];
             hasStartedConversation = false;
             clearStoredMessages();
-            const c = document.getElementById('dharma-messages');
+            const c = $id('dharma-messages');
             if (c) {
                 c.innerHTML = '';
                 c.appendChild(renderSuggestions());
@@ -619,9 +625,9 @@ function createWidget(cfg) {
 
     // ── open / close ──────────────────────────────────────────────────────────
     function openChat() {
-        const bubble = document.getElementById('dharma-bubble');
+        const bubble = $id('dharma-bubble');
         if (bubble) bubble.style.display = 'none';
-        if (document.getElementById('dharma-window')) return;
+        if ($id('dharma-window')) return;
 
         const win = document.createElement('div');
         win.id    = 'dharma-window';
@@ -646,9 +652,9 @@ function createWidget(cfg) {
                     placeholder="${cfg.placeholder}" autocomplete="off" />
                 <button id="dharma-send-btn" disabled>${ICONS.send}</button>
             </div>`;
-        document.body.appendChild(win);
+        shadowRoot.appendChild(win);
 
-        const msgContainer = document.getElementById('dharma-messages');
+        const msgContainer = $id('dharma-messages');
         if (messages.length === 0) {
             msgContainer.appendChild(renderSuggestions());
             showWelcome();
@@ -657,11 +663,11 @@ function createWidget(cfg) {
             messages.forEach(m => appendMessage(m));
         }
 
-        document.getElementById('dharma-close-btn').addEventListener('click', closeChat);
-        document.getElementById('dharma-menu-btn').addEventListener('click', openClearModal);
+        $id('dharma-close-btn').addEventListener('click', closeChat);
+        $id('dharma-menu-btn').addEventListener('click', openClearModal);
 
-        const input   = document.getElementById('dharma-input');
-        const sendBtn = document.getElementById('dharma-send-btn');
+        const input   = $id('dharma-input');
+        const sendBtn = $id('dharma-send-btn');
         input.addEventListener('input', updateSendBtn);
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -674,12 +680,12 @@ function createWidget(cfg) {
     }
 
     function closeChat() {
-        const win = document.getElementById('dharma-window');
+        const win = $id('dharma-window');
         if (!win) return;
         win.classList.add('dharma-closing');
         setTimeout(() => {
             win.remove();
-            const b = document.getElementById('dharma-bubble');
+            const b = $id('dharma-bubble');
             if (b) b.style.display = 'flex';
         }, 200);
     }
@@ -690,12 +696,19 @@ function createWidget(cfg) {
         btn.id    = 'dharma-bubble';
         btn.innerHTML = `${bubbleIcon()}<div id="dharma-bubble-dot"></div>`;
         btn.addEventListener('click', openChat);
-        document.body.appendChild(btn);
+        shadowRoot.appendChild(btn);
     }
 
     // ── mount ─────────────────────────────────────────────────────────────────
     function mount() {
-        injectStyles(cfg);
+        // Attach shadow DOM so the widget's CSS is fully isolated from the host
+        // page (prevents WordPress or any other site stylesheet from overriding it).
+        const host = document.createElement('div');
+        host.id = 'vs-widget-host';
+        document.body.appendChild(host);
+        shadowRoot = host.attachShadow({ mode: 'open' });
+
+        injectStyles(cfg, shadowRoot);
         buildBubble();
         if (cfg.autoOpen) setTimeout(openChat, cfg.autoOpenDelay);
     }

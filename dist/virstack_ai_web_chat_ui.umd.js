@@ -51,14 +51,15 @@ var VirstackAIWebChatUIWidget = (() => {
     text = text.replace(/\n/g, "<br>");
     return text;
   }
-  function injectStyles(cfg) {
-    if (document.getElementById("vs-widget-styles")) return;
+  function injectStyles(cfg, root) {
     const P = cfg.primaryColor;
     const S = cfg.secondaryColor;
     const BS = cfg.buttonSize;
     const IT = cfg.inputTextColor;
     const BT = cfg.botBgColor;
     const css = `
+:host{all:initial;display:contents;}
+*,*::before,*::after{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 #dharma-bubble{position:fixed;bottom:24px;right:24px;width:${BS}px;height:${BS}px;border-radius:50%;background:${P};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:99998;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .2s ease;}
 #dharma-bubble:hover{transform:scale(1.1)}
 #dharma-bubble:active{transform:scale(.95)}
@@ -94,7 +95,6 @@ var VirstackAIWebChatUIWidget = (() => {
 .dharma-bubble-text.user{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;color:#fff;word-break:break-word;}
 .dharma-bubble-text.bot{background:${BT};border-top-left-radius:4px}
 .dharma-bubble-text.user{background:${P};border-top-right-radius:4px}
-/* WhatsApp-style inline formatting inside bubbles */
 .dharma-bubble-text strong{font-weight:700}
 .dharma-bubble-text em{font-style:italic}
 .dharma-bubble-text s{text-decoration:line-through;opacity:.8}
@@ -139,9 +139,8 @@ var VirstackAIWebChatUIWidget = (() => {
   #dharma-bubble{right:12px;bottom:12px}
 }`;
     const style = document.createElement("style");
-    style.id = "vs-widget-styles";
     style.textContent = css;
-    document.head.appendChild(style);
+    root.appendChild(style);
   }
   var ICONS = {
     sparkles: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>`,
@@ -156,6 +155,10 @@ var VirstackAIWebChatUIWidget = (() => {
     return `<img src="${url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
   }
   function createWidget(cfg) {
+    let shadowRoot = null;
+    function $id(id) {
+      return shadowRoot ? shadowRoot.querySelector("#" + id) : null;
+    }
     const STORAGE_KEY = "vs_messages";
     const MAX_MESSAGES = 200;
     function loadMessages() {
@@ -214,25 +217,25 @@ var VirstackAIWebChatUIWidget = (() => {
       return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " at " + date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     }
     function scrollToBottom() {
-      const el = document.getElementById("dharma-messages");
+      const el = $id("dharma-messages");
       if (el) el.scrollTop = el.scrollHeight;
     }
     function scrollToMessageTop(rowEl) {
-      const container = document.getElementById("dharma-messages");
+      const container = $id("dharma-messages");
       if (!container || !rowEl) return;
       container.scrollTop = rowEl.offsetTop - container.offsetTop - 8;
     }
     function updateSendBtn() {
-      const btn = document.getElementById("dharma-send-btn");
-      const input = document.getElementById("dharma-input");
+      const btn = $id("dharma-send-btn");
+      const input = $id("dharma-input");
       if (btn && input) btn.disabled = !input.value.trim() || isTyping;
     }
     function appendMessage(msg) {
       if (msg.role && SILENT_ROLES.has(msg.role)) return;
       if (msg.role === "assistant" && !msg.text && !msg.content) return;
-      const container = document.getElementById("dharma-messages");
+      const container = $id("dharma-messages");
       if (!container) return;
-      const suggestions = document.getElementById("dharma-suggestions");
+      const suggestions = $id("dharma-suggestions");
       if (suggestions && !msg.isBot) suggestions.remove();
       const isBot = msg.isBot || msg.role === "assistant";
       const row = document.createElement("div");
@@ -267,7 +270,7 @@ var VirstackAIWebChatUIWidget = (() => {
       }
     }
     function showTyping() {
-      const c = document.getElementById("dharma-messages");
+      const c = $id("dharma-messages");
       if (!c) return;
       const el = document.createElement("div");
       el.id = "dharma-typing";
@@ -280,12 +283,12 @@ var VirstackAIWebChatUIWidget = (() => {
       scrollToBottom();
     }
     function hideTyping() {
-      const el = document.getElementById("dharma-typing");
+      const el = $id("dharma-typing");
       if (el) el.remove();
     }
     async function sendMessage(text) {
       if (!text || !text.trim() || isTyping) return;
-      const input = document.getElementById("dharma-input");
+      const input = $id("dharma-input");
       if (input) input.value = "";
       const userMsg = {
         id: String(Date.now()),
@@ -388,7 +391,7 @@ var VirstackAIWebChatUIWidget = (() => {
                 <button class="dharma-modal-confirm">Clear</button>
             </div>`;
       overlay.appendChild(modal);
-      document.body.appendChild(overlay);
+      shadowRoot.appendChild(overlay);
       const close = () => overlay.remove();
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) close();
@@ -399,7 +402,7 @@ var VirstackAIWebChatUIWidget = (() => {
         messages = [];
         hasStartedConversation = false;
         clearStoredMessages();
-        const c = document.getElementById("dharma-messages");
+        const c = $id("dharma-messages");
         if (c) {
           c.innerHTML = "";
           c.appendChild(renderSuggestions());
@@ -422,9 +425,9 @@ var VirstackAIWebChatUIWidget = (() => {
       }, 600);
     }
     function openChat() {
-      const bubble = document.getElementById("dharma-bubble");
+      const bubble = $id("dharma-bubble");
       if (bubble) bubble.style.display = "none";
-      if (document.getElementById("dharma-window")) return;
+      if ($id("dharma-window")) return;
       const win = document.createElement("div");
       win.id = "dharma-window";
       win.innerHTML = `
@@ -448,8 +451,8 @@ var VirstackAIWebChatUIWidget = (() => {
                     placeholder="${cfg.placeholder}" autocomplete="off" />
                 <button id="dharma-send-btn" disabled>${ICONS.send}</button>
             </div>`;
-      document.body.appendChild(win);
-      const msgContainer = document.getElementById("dharma-messages");
+      shadowRoot.appendChild(win);
+      const msgContainer = $id("dharma-messages");
       if (messages.length === 0) {
         msgContainer.appendChild(renderSuggestions());
         showWelcome();
@@ -457,10 +460,10 @@ var VirstackAIWebChatUIWidget = (() => {
         if (!hasStartedConversation) msgContainer.appendChild(renderSuggestions());
         messages.forEach((m) => appendMessage(m));
       }
-      document.getElementById("dharma-close-btn").addEventListener("click", closeChat);
-      document.getElementById("dharma-menu-btn").addEventListener("click", openClearModal);
-      const input = document.getElementById("dharma-input");
-      const sendBtn = document.getElementById("dharma-send-btn");
+      $id("dharma-close-btn").addEventListener("click", closeChat);
+      $id("dharma-menu-btn").addEventListener("click", openClearModal);
+      const input = $id("dharma-input");
+      const sendBtn = $id("dharma-send-btn");
       input.addEventListener("input", updateSendBtn);
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -472,12 +475,12 @@ var VirstackAIWebChatUIWidget = (() => {
       input.focus();
     }
     function closeChat() {
-      const win = document.getElementById("dharma-window");
+      const win = $id("dharma-window");
       if (!win) return;
       win.classList.add("dharma-closing");
       setTimeout(() => {
         win.remove();
-        const b = document.getElementById("dharma-bubble");
+        const b = $id("dharma-bubble");
         if (b) b.style.display = "flex";
       }, 200);
     }
@@ -486,10 +489,14 @@ var VirstackAIWebChatUIWidget = (() => {
       btn.id = "dharma-bubble";
       btn.innerHTML = `${bubbleIcon()}<div id="dharma-bubble-dot"></div>`;
       btn.addEventListener("click", openChat);
-      document.body.appendChild(btn);
+      shadowRoot.appendChild(btn);
     }
     function mount() {
-      injectStyles(cfg);
+      const host = document.createElement("div");
+      host.id = "vs-widget-host";
+      document.body.appendChild(host);
+      shadowRoot = host.attachShadow({ mode: "open" });
+      injectStyles(cfg, shadowRoot);
       buildBubble();
       if (cfg.autoOpen) setTimeout(openChat, cfg.autoOpenDelay);
     }
