@@ -134,6 +134,10 @@ var VirstackAIWebChatUIWidget = (() => {
 @keyframes dharma-blink{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes dharma-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes dharma-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.7}}
+.dharma-cta-wrapper{display:flex;justify-content:flex-start;padding-left:40px;margin-bottom:14px;animation:dharma-msg-in .3s ease both;}
+.dharma-cta-btn{padding:9px 16px;border-radius:20px;border:2px solid ${P};background:#fff;color:${S};font-size:12px;cursor:pointer;transition:background .2s,color .2s,transform .1s,box-shadow .2s;text-align:left;font-family:inherit;max-width:75%;line-height:1.5;}
+.dharma-cta-btn:hover{background:${P};color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);transform:translateY(-1px)}
+.dharma-cta-btn:active{transform:translateY(0)}
 @media(max-width:440px){
   #dharma-window{width:calc(100vw - 24px);right:12px;bottom:90px;height:75vh}
   #dharma-bubble{right:12px;bottom:12px}
@@ -291,6 +295,7 @@ var VirstackAIWebChatUIWidget = (() => {
       if (!text || !text.trim() || isTyping) return;
       const input = $id("dharma-input");
       if (input) input.value = "";
+      clearFollowUpCTA();
       const userMsg = {
         id: String(Date.now()),
         text: text.trim(),
@@ -336,6 +341,7 @@ var VirstackAIWebChatUIWidget = (() => {
             appendMessage(msg);
           }
           saveMessages(messages);
+          if (data.followUp) renderFollowUpCTA(data.followUp, data.followUpMessage);
         } else {
           const reply = data.answer || data.reply || data.message || data.choices?.[0]?.message?.content || "Sorry, I could not find an answer.";
           const botMsg = {
@@ -347,6 +353,7 @@ var VirstackAIWebChatUIWidget = (() => {
           messages.push(botMsg);
           saveMessages(messages);
           appendMessage(botMsg);
+          if (data.followUp) renderFollowUpCTA(data.followUp, data.followUpMessage);
         }
       } catch {
         hideTyping();
@@ -362,6 +369,30 @@ var VirstackAIWebChatUIWidget = (() => {
       }
       isTyping = false;
       updateSendBtn();
+    }
+    function renderFollowUpCTA(displayText, sendText) {
+      const existing = shadowRoot ? shadowRoot.querySelector("#dharma-cta-wrapper") : null;
+      if (existing) existing.remove();
+      const container = $id("dharma-messages");
+      if (!container) return;
+      const wrapper = document.createElement("div");
+      wrapper.id = "dharma-cta-wrapper";
+      wrapper.className = "dharma-cta-wrapper";
+      const btn = document.createElement("button");
+      btn.id = "dharma-cta-btn";
+      btn.className = "dharma-cta-btn";
+      btn.textContent = displayText;
+      btn.addEventListener("click", () => {
+        wrapper.remove();
+        sendMessage(sendText || displayText);
+      });
+      wrapper.appendChild(btn);
+      container.appendChild(wrapper);
+      scrollToBottom();
+    }
+    function clearFollowUpCTA() {
+      const existing = shadowRoot ? shadowRoot.querySelector("#dharma-cta-wrapper") : null;
+      if (existing) existing.remove();
     }
     function renderSuggestions() {
       const wrap = document.createElement("div");
@@ -403,6 +434,7 @@ var VirstackAIWebChatUIWidget = (() => {
         messages = [];
         hasStartedConversation = false;
         clearStoredMessages();
+        clearFollowUpCTA();
         const c = $id("dharma-messages");
         if (c) {
           c.innerHTML = "";
