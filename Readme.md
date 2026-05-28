@@ -162,7 +162,7 @@ The widget reads the reply from your server response. It checks these fields in 
 { "answer": "Our plans start at $29/mo." }
 ```
 
-**Full conversation response (recommended — preserves tool-call context):**
+**OpenAI-compatible response (also works directly):**
 
 ```json
 {
