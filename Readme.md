@@ -17,6 +17,7 @@ Built by [Virstack](https://virstack.com).
 - Auto-opens on page load with a customisable greeting message
 - Persists full conversation history in `localStorage`
 - Sends conversation history as `{ messages: [] }` (OpenAI-compatible format) on every message
+- Follow-up suggestion button — renders a tappable Call-to-Action chip after every bot reply, driven by `followUp` / `followUpMessage` fields in the server response
 - Suggestion chips configurable via a comma-separated attribute
 - Clear conversation option in the chat menu
 - Mobile responsive
@@ -153,6 +154,7 @@ The widget reads the reply from your server response. It checks these fields in 
 | `reply` | `{ "reply": "Our plans start at $29/mo." }` |
 | `message` | `{ "message": "Our plans start at $29/mo." }` |
 | OpenAI format | `{ "choices": [{ "message": { "content": "..." } }] }` |
+| `messages` array | `{ "messages": [{ "role": "assistant", "content": "..." }] }` |
 
 **Minimal valid response:**
 
@@ -160,20 +162,63 @@ The widget reads the reply from your server response. It checks these fields in 
 { "answer": "Our plans start at $29/mo." }
 ```
 
-**OpenAI-compatible response (also works directly):**
+**Full conversation response (recommended — preserves tool-call context):**
 
 ```json
 {
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "Our plans start at $29/mo."
-      }
-    }
-  ]
+  "messages": [
+    { "role": "user",      "content": "What are your pricing plans?" },
+    { "role": "assistant", "content": "Our plans start at $29/mo." }
+  ],
+  "followUp": "Tell me about the free trial",
+  "followUpMessage": "I would like to know more about the free trial"
 }
 ```
+
+When the server returns a `messages` array, the widget appends only the new turns (everything beyond what it sent). Tool-use and tool-result turns are stored silently — kept in the outgoing payload for context but never shown as chat bubbles.
+
+#### Follow-up fields
+
+| Field | Type | Description |
+|---|---|---|
+| `followUp` | `string` | Short label displayed on the follow-up suggestion button |
+| `followUpMessage` | `string` | Full text sent as the next user message when the button is tapped. Falls back to `followUp` if omitted |
+
+Both fields are optional. When present, the widget renders a pill-shaped button below the latest bot message. Tapping it dismisses the button and sends `followUpMessage` as the next turn. If the server omits these fields, no button is shown.
+
+---
+
+## Follow-Up Suggestions
+
+After every bot reply the widget can render a contextual suggestion button that lets the user continue the conversation with a single tap.
+
+### How it works
+
+1. Your server appends `followUp` and `followUpMessage` to the response JSON.
+2. The widget displays a pill-shaped button below the latest bot message labelled with `followUp`.
+3. When tapped, the button is removed and `followUpMessage` is sent as the next user message — no typing required.
+4. The button is automatically cleared whenever the user sends any new message, whether by typing or tapping the chip.
+
+### Backend example
+
+```js
+app.post('/chat', async (req, res) => {
+  const { messages } = req.body;
+  const reply = await myLLM.chat(messages);
+
+  res.json({
+    messages: [...messages, { role: 'assistant', content: reply }],
+    followUp: 'Tell me about the free trial',
+    followUpMessage: 'I would like to know more about the free trial',
+  });
+});
+```
+
+If `followUpMessage` is omitted, the widget falls back to sending `followUp` as the message text.
+
+### Styling
+
+The follow-up button inherits `data-primary-color` for its border and hover background, and `data-secondary-color` for its text — no extra configuration needed.
 
 ---
 
