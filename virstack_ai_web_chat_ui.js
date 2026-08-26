@@ -160,7 +160,6 @@ function injectStyles(cfg, root) {
 #dharma-bubble{position:fixed;bottom:24px;right:24px;width:${BS}px;height:${BS}px;border-radius:50%;background:${P};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:99998;box-shadow:0 8px 32px rgba(0,0,0,.25);transition:transform .2s ease;overflow:hidden;}
 #dharma-bubble:hover{transform:scale(1.1)}
 #dharma-bubble:active{transform:scale(.95)}
-#dharma-bubble-dot{position:absolute;top:4px;right:4px;width:12px;height:12px;border-radius:50%;background:${S};animation:dharma-pulse 2s ease-in-out infinite;z-index:1;}
 #dharma-window{position:fixed;bottom:45px;right:24px;width:384px;height:600px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.2);display:flex;flex-direction:column;z-index:99999;overflow:hidden;animation:dharma-open .3s cubic-bezier(.34,1.56,.64,1) both;}
 #dharma-window.dharma-closing{animation:dharma-close .2s ease forwards}
 #dharma-header{background:${S};padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
@@ -731,7 +730,7 @@ function createWidget(cfg) {
     function buildBubble() {
         const btn = document.createElement('button');
         btn.id    = 'dharma-bubble';
-        btn.innerHTML = `${bubbleIcon()}<div id="dharma-bubble-dot"></div>`;
+        btn.innerHTML = `${bubbleIcon()}`;
         btn.addEventListener('click', openChat);
         shadowRoot.appendChild(btn);
     }
