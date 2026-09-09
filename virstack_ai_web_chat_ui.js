@@ -266,32 +266,6 @@ function createWidget(cfg) {
     let shadowRoot = null;
     function $id(id) { return shadowRoot ? shadowRoot.querySelector('#' + id) : null; }
 
-    // ── localStorage helpers ──────────────────────────────────────────────────
-    const STORAGE_KEY  = 'vs_messages';
-    const MAX_MESSAGES = 200;
-
-    function loadMessages() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return [];
-            return JSON.parse(raw).map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
-        } catch {
-            return [];
-        }
-    }
-
-    function saveMessages(msgs) {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(
-                msgs.slice(-MAX_MESSAGES).map(m => ({ ...m, timestamp: m.timestamp.toISOString() }))
-            ));
-        } catch { /* storage quota — silently ignore */ }
-    }
-
-    function clearStoredMessages() {
-        localStorage.removeItem(STORAGE_KEY);
-    }
-
     // ── API message serialiser ────────────────────────────────────────────────
     /**
      * Build the outgoing messages array.
@@ -310,18 +284,40 @@ function createWidget(cfg) {
         });
     }
 
-    // ── device id ─────────────────────────────────────────────────────────────
-    let deviceId = localStorage.getItem('vs_device_id');
-    if (!deviceId) {
-        deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-            const r = (Math.random() * 16) | 0;
-            return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-        });
-        localStorage.setItem('vs_device_id', deviceId);
+    // ── history fetch ─────────────────────────────────────────────────────────
+    async function fetchHistory() {
+        try {
+            const url = cfg.serverUrl + '?deviceId=' + encodeURIComponent(deviceId);
+            const res = await fetch(url);
+            const data = await res.json();
+            const incoming = Array.isArray(data.messages) ? data.messages : [];
+            return incoming.map(turn => ({
+                id:        String(Date.now() + Math.random()),
+                text:      typeof turn.content === 'string' ? turn.content : '',
+                isBot:     turn.role === 'assistant',
+                timestamp: new Date(),
+            }));
+        } catch {
+            return [];
+        }
     }
 
+    // ── device id ─────────────────────────────────────────────────────────────
+    function getOrCreateDeviceId() {
+        let deviceId = localStorage.getItem('vs_device_id');
+        if (!deviceId) {
+            deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = (Math.random() * 16) | 0;
+                return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+            });
+            localStorage.setItem('vs_device_id', deviceId);
+        }
+        return deviceId;
+    }
+    let deviceId = getOrCreateDeviceId();
+
     // ── state ─────────────────────────────────────────────────────────────────
-    let messages = loadMessages();
+    let messages = [];
     let isTyping = false;
     let hasStartedConversation = messages.some(m => !m.isBot && !m.role);
 
@@ -464,7 +460,6 @@ function createWidget(cfg) {
             timestamp: new Date(),
         };
         messages.push(userMsg);
-        saveMessages(messages);
         appendMessage(userMsg);
         hasStartedConversation = true;
 
@@ -484,7 +479,7 @@ function createWidget(cfg) {
                     'Content-Type': 'application/json',
                     'X-Timezone':   Intl.DateTimeFormat().resolvedOptions().timeZone,
                 },
-                body:    JSON.stringify({ messages: buildApiMessages(messages) }),
+                body:    JSON.stringify({ messages: buildApiMessages(messages), deviceId }),
             });
             const data = await res.json();
             hideTyping();
@@ -523,7 +518,6 @@ function createWidget(cfg) {
                     // appendMessage skips silent roles automatically
                     appendMessage(msg);
                 }
-                saveMessages(messages);
                 if (data.followUp) renderFollowUpCTA(data.followUp, data.followUpMessage);
 
             } else {
@@ -542,7 +536,6 @@ function createWidget(cfg) {
                     timestamp: new Date(),
                 };
                 messages.push(botMsg);
-                saveMessages(messages);
                 appendMessage(botMsg);
                 if (data.followUp) renderFollowUpCTA(data.followUp, data.followUpMessage);
             }
@@ -556,7 +549,6 @@ function createWidget(cfg) {
                 timestamp: new Date(),
             };
             messages.push(errMsg);
-            saveMessages(messages);
             appendMessage(errMsg);
         }
 
@@ -632,8 +624,11 @@ function createWidget(cfg) {
         modal.querySelector('.dharma-modal-confirm').addEventListener('click', () => {
             messages = [];
             hasStartedConversation = false;
-            clearStoredMessages();
             clearFollowUpCTA();
+
+            localStorage.removeItem('vs_device_id');
+            deviceId = getOrCreateDeviceId();
+
             const c = $id('dharma-messages');
             if (c) {
                 c.innerHTML = '';
@@ -654,16 +649,19 @@ function createWidget(cfg) {
                 timestamp: new Date(),
             };
             messages.push(w);
-            saveMessages(messages);
             appendMessage(w);
         }, 600);
     }
 
     // ── open / close ──────────────────────────────────────────────────────────
-    function openChat() {
+    async function openChat() {
         const bubble = $id('dharma-bubble');
         if (bubble) bubble.style.display = 'none';
         if ($id('dharma-window')) return;
+        if (messages.length === 0) {
+            messages = await fetchHistory();
+            hasStartedConversation = messages.length > 0;
+        }
 
         const win = document.createElement('div');
         win.id    = 'dharma-window';

@@ -162,28 +162,6 @@ var VirstackAIWebChatUIWidget = (() => {
     function $id(id) {
       return shadowRoot ? shadowRoot.querySelector("#" + id) : null;
     }
-    const STORAGE_KEY = "vs_messages";
-    const MAX_MESSAGES = 200;
-    function loadMessages() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return [];
-        return JSON.parse(raw).map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
-      } catch {
-        return [];
-      }
-    }
-    function saveMessages(msgs) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(
-          msgs.slice(-MAX_MESSAGES).map((m) => ({ ...m, timestamp: m.timestamp.toISOString() }))
-        ));
-      } catch {
-      }
-    }
-    function clearStoredMessages() {
-      localStorage.removeItem(STORAGE_KEY);
-    }
     function buildApiMessages(msgs) {
       return msgs.map((m) => {
         if (m.role) {
@@ -193,15 +171,35 @@ var VirstackAIWebChatUIWidget = (() => {
         return { role: m.isBot ? "assistant" : "user", content: m.text };
       });
     }
-    let deviceId = localStorage.getItem("vs_device_id");
-    if (!deviceId) {
-      deviceId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        return (c === "x" ? r : r & 3 | 8).toString(16);
-      });
-      localStorage.setItem("vs_device_id", deviceId);
+    async function fetchHistory() {
+      try {
+        const url = cfg.serverUrl + "?deviceId=" + encodeURIComponent(deviceId);
+        const res = await fetch(url);
+        const data = await res.json();
+        const incoming = Array.isArray(data.messages) ? data.messages : [];
+        return incoming.map((turn) => ({
+          id: String(Date.now() + Math.random()),
+          text: typeof turn.content === "string" ? turn.content : "",
+          isBot: turn.role === "assistant",
+          timestamp: /* @__PURE__ */ new Date()
+        }));
+      } catch {
+        return [];
+      }
     }
-    let messages = loadMessages();
+    function getOrCreateDeviceId() {
+      let deviceId2 = localStorage.getItem("vs_device_id");
+      if (!deviceId2) {
+        deviceId2 = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+          const r = Math.random() * 16 | 0;
+          return (c === "x" ? r : r & 3 | 8).toString(16);
+        });
+        localStorage.setItem("vs_device_id", deviceId2);
+      }
+      return deviceId2;
+    }
+    let deviceId = getOrCreateDeviceId();
+    let messages = [];
     let isTyping = false;
     let hasStartedConversation = messages.some((m) => !m.isBot && !m.role);
     const DEFAULT_SUGGESTIONS = [
@@ -302,7 +300,6 @@ var VirstackAIWebChatUIWidget = (() => {
         timestamp: /* @__PURE__ */ new Date()
       };
       messages.push(userMsg);
-      saveMessages(messages);
       appendMessage(userMsg);
       hasStartedConversation = true;
       isTyping = true;
@@ -316,7 +313,7 @@ var VirstackAIWebChatUIWidget = (() => {
             "Content-Type": "application/json",
             "X-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone
           },
-          body: JSON.stringify({ messages: buildApiMessages(messages) })
+          body: JSON.stringify({ messages: buildApiMessages(messages), deviceId })
         });
         const data = await res.json();
         hideTyping();
@@ -339,7 +336,6 @@ var VirstackAIWebChatUIWidget = (() => {
             messages.push(msg);
             appendMessage(msg);
           }
-          saveMessages(messages);
           if (data.followUp) renderFollowUpCTA(data.followUp, data.followUpMessage);
         } else {
           const reply = data.answer || data.reply || data.message || data.choices?.[0]?.message?.content || "Sorry, I could not find an answer.";
@@ -350,7 +346,6 @@ var VirstackAIWebChatUIWidget = (() => {
             timestamp: /* @__PURE__ */ new Date()
           };
           messages.push(botMsg);
-          saveMessages(messages);
           appendMessage(botMsg);
           if (data.followUp) renderFollowUpCTA(data.followUp, data.followUpMessage);
         }
@@ -363,7 +358,6 @@ var VirstackAIWebChatUIWidget = (() => {
           timestamp: /* @__PURE__ */ new Date()
         };
         messages.push(errMsg);
-        saveMessages(messages);
         appendMessage(errMsg);
       }
       isTyping = false;
@@ -432,8 +426,9 @@ var VirstackAIWebChatUIWidget = (() => {
       modal.querySelector(".dharma-modal-confirm").addEventListener("click", () => {
         messages = [];
         hasStartedConversation = false;
-        clearStoredMessages();
         clearFollowUpCTA();
+        localStorage.removeItem("vs_device_id");
+        deviceId = getOrCreateDeviceId();
         const c = $id("dharma-messages");
         if (c) {
           c.innerHTML = "";
@@ -452,14 +447,17 @@ var VirstackAIWebChatUIWidget = (() => {
           timestamp: /* @__PURE__ */ new Date()
         };
         messages.push(w);
-        saveMessages(messages);
         appendMessage(w);
       }, 600);
     }
-    function openChat() {
+    async function openChat() {
       const bubble = $id("dharma-bubble");
       if (bubble) bubble.style.display = "none";
       if ($id("dharma-window")) return;
+      if (messages.length === 0) {
+        messages = await fetchHistory();
+        hasStartedConversation = messages.length > 0;
+      }
       const win = document.createElement("div");
       win.id = "dharma-window";
       win.innerHTML = `
